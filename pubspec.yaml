@@ -34,6 +34,8 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  pdf: ^3.10.7
+  printing: ^5.12.0
 
 dev_dependencies:
   flutter_test:
@@ -45,7 +47,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
-  flutter_launcher_icons: ^0.10.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -65,10 +67,13 @@ flutter:
 
   # The project keeps the provided image at `assets/logo.png` and bundles
   # it so it can be used inside the app UI where desired.
-  # Include the entire assets directory so the different pond images can be
-  # previewed in the UI (pond.png, "pond 2.png", logo.png, etc.).
+  # Bundle only the final chosen asset to keep the app bundle small. If you
+  # later add new preview images, list them explicitly here or switch back
+  # to bundling the whole folder while testing.
   assets:
-    - assets/
+  - assets/pond.png
+  - assets/logo.png
+  - assets/bm9c_py8p_191023.jpg
 
 # Configuration for the flutter_launcher_icons package to generate
 # platform launcher icons from the provided logo at assets/logo.png

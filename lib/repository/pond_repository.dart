@@ -16,6 +16,8 @@ class PondRepository {
   final List<Product> products = [];
   final Map<int, List<Usage>> pondUsages = {}; // pondId -> usages
   final List<String> ponds = [];
+  bool _seeded = false;
+  int _initialCount = 0;
 
   void addProduct(Product p) {
     products.add(p);
@@ -23,9 +25,10 @@ class PondRepository {
 
   // Pond management
   void _seedPonds() {
-    if (ponds.isEmpty) {
-      for (var i = 1; i <= 6; i++) { ponds.add('Pond $i'); }
-    }
+    if (_seeded) return;
+    ponds.addAll(List.generate(6, (index) => 'Pond ${index + 1}'));
+    _initialCount = ponds.length;
+    _seeded = true;
   }
 
   int getPondCount() {
@@ -43,12 +46,53 @@ class PondRepository {
     ponds.add(name);
   }
 
+  void renamePond(int pondId, String name) {
+    if (pondId < 1 || pondId > ponds.length) return;
+    ponds[pondId - 1] = name;
+  }
+
+  bool removePond(int pondId) {
+    if (pondId < 1 || pondId > ponds.length) return false;
+    if (pondId <= _initialCount) return false;
+    ponds.removeAt(pondId - 1);
+    pondUsages.remove(pondId);
+
+    final keysToShift = pondUsages.keys.where((k) => k > pondId).toList()..sort();
+    for (final key in keysToShift) {
+      final usages = pondUsages.remove(key);
+      if (usages != null) {
+        pondUsages[key - 1] = usages;
+      }
+    }
+    return true;
+  }
+
   List<Usage> getUsagesForPond(int pondId) {
     return pondUsages[pondId] ?? [];
   }
 
   void addUsage(int pondId, Usage u) {
     pondUsages.putIfAbsent(pondId, () => []).add(u);
+  }
+
+  bool updateUsage(int pondId, int index, Usage updated) {
+    final list = pondUsages[pondId];
+    if (list == null || index < 0 || index >= list.length) return false;
+    list[index] = updated;
+    return true;
+  }
+
+  bool removeUsageAt(int pondId, int index) {
+    final list = pondUsages[pondId];
+    if (list == null || index < 0 || index >= list.length) return false;
+    list.removeAt(index);
+    return true;
+  }
+
+  int indexOfUsage(int pondId, Usage usage) {
+    final list = pondUsages[pondId];
+    if (list == null) return -1;
+    return list.indexOf(usage);
   }
 
   double totalWeightForPond(int pondId) {

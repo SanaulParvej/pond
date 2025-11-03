@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
-import '../widgets/logo_widget.dart';
+// Use the pond image directly for the splash logo
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -51,9 +51,20 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           child: ScaleTransition(
             scale: _anim,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              // use shared LogoWidget (white circle with colored icon)
-              // splash uses a white circular logo with the primary-colored pool icon
-              LogoWidget(size: 92, circleColor: Colors.white, iconColor: primary, elevated: true),
+              // Show the chosen pond image inside a white circular badge so
+              // the splash matches the pond tiles.
+              Container(
+                width: 92,
+                height: 92,
+                decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/bm9c_py8p_191023.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stack) => Center(child: Icon(Icons.pool, size: 44, color: primary)),
+                  ),
+                ),
+              ),
               const SizedBox(height: 18),
               Text('Pond Management', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800, shadows: [BoxShadow(color: Colors.black.withAlpha((0.2 * 255).round()), blurRadius: 6)])),
               const SizedBox(height: 8),

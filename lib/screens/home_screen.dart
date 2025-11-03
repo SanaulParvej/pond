@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../repository/pond_repository.dart';
 import 'add_product_screen.dart';
@@ -19,17 +18,35 @@ class _HomeScreenState extends State<HomeScreen> {
     final ok = await showDialog<bool>(context: context, builder: (context) {
       return AlertDialog(
         title: const Text('Add Pond'),
-        content: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Pond name (e.g. Pond 7)')),
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          enableSuggestions: false,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(labelText: 'Pond name (optional)'),
+          onSubmitted: (_) => Navigator.of(context).pop(true),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () { if (nameCtrl.text.trim().isEmpty) return; Navigator.of(context).pop(true); }, child: const Text('Save')),
+          ElevatedButton(onPressed: () {
+            // Allow saving even when the name field is empty; the caller
+            // will substitute a default pond name. This makes the quick
+            // add-from-appbar flow frictionless.
+            Navigator.of(context).pop(true);
+          }, child: const Text('Save')),
         ],
       );
     });
 
     if (ok == true) {
       final name = nameCtrl.text.trim();
-      PondRepository.instance.addPond(name.isEmpty ? 'Pond ${PondRepository.instance.getPondCount() + 1}' : name);
+      if (name.isEmpty) {
+        // Auto-generate the next sequential name when none is provided.
+        final nextNumber = PondRepository.instance.getPondCount() + 1;
+        PondRepository.instance.addPond('Pond $nextNumber');
+      } else {
+        PondRepository.instance.addPond(name);
+      }
       setState(() {});
     }
   }
@@ -42,6 +59,35 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openAddProductQuick({required String type}) async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddProductScreen(productType: type)));
     setState(() {});
+  }
+
+  Future<void> _confirmDeletePond(int pondId) async {
+    final pondName = repo.getPondName(pondId);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Pond'),
+        content: Text('Remove $pondName along with its usage records?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final removed = repo.removePond(pondId);
+      if (removed) {
+        if (mounted) {
+          setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$pondName removed')));
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Core ponds cannot be removed')));
+        }
+      }
+    }
   }
 
   @override
@@ -106,34 +152,25 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             sliver: SliverGrid(
-              // Always show 6 pond tiles (placeholders if fewer ponds are defined).
+              // Show at least 6 tiles, but if you add more ponds, expand to show all.
               delegate: SliverChildBuilderDelegate((context, index) {
                 final pondIndex = index + 1;
                 final hasPond = pondIndex <= PondRepository.instance.getPondCount();
         final usages = hasPond ? repo.getUsagesForPond(pondIndex) : <dynamic>[];
         final totalCost = hasPond ? repo.totalCostForPond(pondIndex) : 0.0;
         final pondName = hasPond ? PondRepository.instance.getPondName(pondIndex) : 'Pond $pondIndex';
-                // Cycle through available pond images so you can compare multiple
-                // options. The assets folder contains several images (pond.png,
-                // "pond 2.png", bay_10506833.png, cove_10506818.png).
-                final assetCandidates = [
-                  'assets/pond.png',
-                  'assets/pond 2.png',
-                  'assets/bay_10506833.png',
-                  'assets/cove_10506818.png',
-                ];
-        // Use the app logo for ponds 5 and 6 per user request; otherwise
-        // cycle through the candidate images for comparison.
-        final assetPath = hasPond
-          ? ((pondIndex == 5 || pondIndex == 6) ? 'assets/logo.png' : assetCandidates[(pondIndex - 1) % assetCandidates.length])
-          : 'assets/logo.png';
-
+                // Use the Pond image everywhere as requested. This keeps the
+                // look uniform and makes it easy to swap the single image in
+                // `assets/` later if you want a different global icon.
+                const globalPondAsset = 'assets/pond.png';
+                final assetPath = globalPondAsset;
                 return Material(
                   color: Colors.white,
                   elevation: 2,
                   borderRadius: BorderRadius.circular(14),
                   child: InkWell(
                     onTap: hasPond ? () => _openPond(pondIndex) : null,
+                    onLongPress: hasPond ? () => _confirmDeletePond(pondIndex) : null,
                     borderRadius: BorderRadius.circular(14),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
@@ -196,7 +233,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 );
-              }, childCount: 6),
+              }, childCount: (() {
+                final count = PondRepository.instance.getPondCount();
+                return count < 6 ? 6 : count;
+              })()),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 14, mainAxisSpacing: 14, childAspectRatio: 0.95),
             ),
           ),
