@@ -1,107 +1,225 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:meta/meta.dart';
+
+import '../models/pond_info.dart';
 import '../models/product.dart';
 import '../models/usage.dart';
 
 class PondRepository {
-  PondRepository._internal() {
-    // seed example products
-    products.addAll([
-      Product(name: 'Feed A', code: 'F001', unit: 'kg', pricePerUnit: 50.0, category: 'feed'),
-      Product(name: 'Feed B', code: 'F002', unit: 'kg', pricePerUnit: 60.0, category: 'feed'),
-      Product(name: 'Medicine X', code: 'M001', unit: 'gm', pricePerUnit: 0.5, category: 'medicine'),
-    ]);
-  }
+  PondRepository._internal({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   static final PondRepository instance = PondRepository._internal();
 
-  final List<Product> products = [];
-  final Map<int, List<Usage>> pondUsages = {}; // pondId -> usages
-  final List<String> ponds = [];
-  bool _seeded = false;
-  int _initialCount = 0;
+  FirebaseFirestore _firestore;
 
-  void addProduct(Product p) {
-    products.add(p);
+  static const _productsCollection = 'products';
+  static const _pondsCollection = 'ponds';
+  static const _usagesCollection = 'usages';
+
+  @visibleForTesting
+  void configureFirestore(FirebaseFirestore firestore) {
+    _firestore = firestore;
   }
 
-  // Pond management
-  void _seedPonds() {
-    if (_seeded) return;
-    ponds.addAll(List.generate(6, (index) => 'Pond ${index + 1}'));
-    _initialCount = ponds.length;
-    _seeded = true;
-  }
+  CollectionReference<Map<String, dynamic>> get _productsRef =>
+      _firestore.collection(_productsCollection);
 
-  int getPondCount() {
-    _seedPonds();
-    return ponds.length;
-  }
+  CollectionReference<Map<String, dynamic>> get _pondsRef =>
+      _firestore.collection(_pondsCollection);
 
-  String getPondName(int pondId) {
-    _seedPonds();
-    if (pondId - 1 < 0 || pondId - 1 >= ponds.length) return 'Pond $pondId';
-    return ponds[pondId - 1];
-  }
+  CollectionReference<Map<String, dynamic>> get _usagesRef =>
+      _firestore.collection(_usagesCollection);
 
-  void addPond(String name) {
-    ponds.add(name);
-  }
+  Future<void> ensureSeedData() async {
+    final snapshot = await _pondsRef.limit(1).get();
+    if (snapshot.docs.isNotEmpty) return;
 
-  void renamePond(int pondId, String name) {
-    if (pondId < 1 || pondId > ponds.length) return;
-    ponds[pondId - 1] = name;
-  }
-
-  bool removePond(int pondId) {
-    if (pondId < 1 || pondId > ponds.length) return false;
-    if (pondId <= _initialCount) return false;
-    ponds.removeAt(pondId - 1);
-    pondUsages.remove(pondId);
-
-    final keysToShift = pondUsages.keys.where((k) => k > pondId).toList()..sort();
-    for (final key in keysToShift) {
-      final usages = pondUsages.remove(key);
-      if (usages != null) {
-        pondUsages[key - 1] = usages;
-      }
+    final batch = _firestore.batch();
+    for (var i = 1; i <= 6; i++) {
+      final doc = _pondsRef.doc('pond_$i');
+      batch.set(doc, {
+        'id': i,
+        'name': 'Pond $i',
+        'isCore': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
     }
+    await batch.commit();
+  }
+
+  Stream<List<Product>> watchProducts() {
+    return _productsRef.orderBy('name').snapshots().map((snapshot) {
+      return snapshot.docs
+          .map((doc) => Product.fromMap(doc.data()))
+          .toList(growable: false);
+    });
+  }
+
+  Future<void> addProduct(Product product) async {
+    final doc = _productsRef.doc(product.code);
+    await doc.set(
+      {
+        ...product.toMap(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  Future<void> updateProduct(String originalCode, Product updated) async {
+    if (originalCode == updated.code) {
+      await _productsRef.doc(originalCode).set(
+        {
+          ...updated.toMap(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+      return;
+    }
+
+    await _firestore.runTransaction((transaction) async {
+      final newDoc = _productsRef.doc(updated.code);
+      final newSnapshot = await transaction.get(newDoc);
+      if (newSnapshot.exists) {
+        throw StateError('Product code already exists');
+      }
+      transaction.set(newDoc, {
+        ...updated.toMap(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      transaction.delete(_productsRef.doc(originalCode));
+    });
+  }
+
+  Future<void> removeProduct(String code) async {
+    await _productsRef.doc(code).delete();
+  }
+
+  Stream<List<PondInfo>> watchPonds() {
+    return _pondsRef.orderBy('id').snapshots().map((snapshot) {
+      return snapshot.docs
+          .map((doc) => PondInfo.fromMap(doc.data()))
+          .toList(growable: false);
+    });
+  }
+
+  Future<int> _nextPondId() async {
+    final snapshot = await _pondsRef.orderBy('id', descending: true).limit(1).get();
+    if (snapshot.docs.isEmpty) return 1;
+    final data = snapshot.docs.first.data();
+    final current = data['id'];
+    if (current is num) return current.toInt() + 1;
+    if (current is String) {
+      final parsed = int.tryParse(current);
+      if (parsed != null) return parsed + 1;
+    }
+    return 1;
+  }
+
+  Future<PondInfo> createPond(String name) async {
+    final trimmed = name.trim();
+    final resolvedName = trimmed.isEmpty
+        ? 'Pond ${DateTime.now().millisecondsSinceEpoch}'
+        : trimmed;
+    final id = await _nextPondId();
+    final doc = _pondsRef.doc('pond_$id');
+    final payload = {
+      'id': id,
+      'name': resolvedName,
+      'isCore': false,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    await doc.set(payload);
+    return PondInfo.fromMap(payload);
+  }
+
+  Future<void> renamePond(int pondId, String name) async {
+    final doc = _pondsRef.doc('pond_$pondId');
+    await doc.set(
+      {
+        'name': name,
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  Future<bool> deletePond(int pondId) async {
+    final doc = _pondsRef.doc('pond_$pondId');
+    final snapshot = await doc.get();
+    if (!snapshot.exists) return false;
+    final info = PondInfo.fromMap(snapshot.data() ?? {});
+    if (info.isCore) {
+      return false;
+    }
+
+    final batch = _firestore.batch();
+    batch.delete(doc);
+
+    final usagesSnapshot = await _usagesRef.where('pondId', isEqualTo: pondId).get();
+    for (final usageDoc in usagesSnapshot.docs) {
+      batch.delete(usageDoc.reference);
+    }
+
+    await batch.commit();
     return true;
   }
 
-  List<Usage> getUsagesForPond(int pondId) {
-    return pondUsages[pondId] ?? [];
+  Stream<Map<int, List<Usage>>> watchAllUsages() {
+    return _usagesRef.orderBy('date', descending: true).snapshots().map((snapshot) {
+      final result = <int, List<Usage>>{};
+      for (final doc in snapshot.docs) {
+        final usage = Usage.fromMap(doc.data(), id: doc.id);
+        result.putIfAbsent(usage.pondId, () => <Usage>[]).add(usage);
+      }
+      for (final entry in result.entries) {
+        entry.value.sort((a, b) => b.date.compareTo(a.date));
+      }
+      return result;
+    });
   }
 
-  void addUsage(int pondId, Usage u) {
-    pondUsages.putIfAbsent(pondId, () => []).add(u);
+  Future<void> addUsage(Usage usage) async {
+    await _usagesRef.add({
+      ...usage.toMap(),
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
-  bool updateUsage(int pondId, int index, Usage updated) {
-    final list = pondUsages[pondId];
-    if (list == null || index < 0 || index >= list.length) return false;
-    list[index] = updated;
+  Future<bool> updateUsage(Usage usage) async {
+    final usageId = usage.id;
+    if (usageId == null) return false;
+    await _usagesRef.doc(usageId).set(
+      {
+        ...usage.toMap(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
     return true;
   }
 
-  bool removeUsageAt(int pondId, int index) {
-    final list = pondUsages[pondId];
-    if (list == null || index < 0 || index >= list.length) return false;
-    list.removeAt(index);
+  Future<bool> removeUsage(String usageId) async {
+    final doc = _usagesRef.doc(usageId);
+    final snapshot = await doc.get();
+    if (!snapshot.exists) {
+      return false;
+    }
+    await doc.delete();
     return true;
   }
 
-  int indexOfUsage(int pondId, Usage usage) {
-    final list = pondUsages[pondId];
-    if (list == null) return -1;
-    return list.indexOf(usage);
-  }
-
-  double totalWeightForPond(int pondId) {
-    final list = getUsagesForPond(pondId);
-    return list.fold(0.0, (s, e) => s + e.weight);
-  }
-
-  double totalCostForPond(int pondId) {
-    final list = getUsagesForPond(pondId);
-    return list.fold(0.0, (s, e) => s + e.totalPrice);
+  Future<Product?> productByCode(String code) async {
+    final doc = await _productsRef.doc(code).get();
+    if (!doc.exists) return null;
+    return Product.fromMap(doc.data() ?? {});
   }
 }
+

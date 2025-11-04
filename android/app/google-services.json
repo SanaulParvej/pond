@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "565543208299",
+    "project_id": "pond-management",
+    "storage_bucket": "pond-management.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:565543208299:android:f8261f6c82ef53f32e382e",
+        "android_client_info": {
+          "package_name": "com.example.pond_management"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFPGVb7XxCm7-eVXDqDiVWdJMItGVdCv4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

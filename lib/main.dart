@@ -1,8 +1,14 @@
-
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'screens/splash_screen.dart';
+import 'package:get/get.dart';
 
-void main() {
+import 'bindings/app_bindings.dart';
+import 'routes/app_pages.dart';
+import 'routes/app_routes.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const PondApp());
 }
 
@@ -11,11 +17,15 @@ class PondApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = const Color(0xFF0B63C6); // slightly brighter blue
+    final primary = const Color(0xFF0B63C6);
     final accent = const Color(0xFF2E7D32);
-    final colorScheme = ColorScheme.fromSeed(seedColor: primary, primary: primary, secondary: accent);
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: primary,
+      primary: primary,
+      secondary: accent,
+    );
 
-    return MaterialApp(
+    return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Pond Management',
       theme: ThemeData(
@@ -28,31 +38,43 @@ class PondApp extends StatelessWidget {
           centerTitle: true,
           elevation: 2,
           toolbarHeight: 64,
-          titleTextStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+          titleTextStyle: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: primary,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             foregroundColor: primary,
-            // use withAlpha to avoid withOpacity deprecation
             side: BorderSide(color: primary.withAlpha((0.14 * 255).round())),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          // prefer surfaceContainerHighest from the color scheme for input fills
           fillColor: colorScheme.surfaceContainerHighest,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 14,
+            horizontal: 14,
+          ),
         ),
         cardColor: Colors.white,
         textTheme: const TextTheme(
@@ -61,8 +83,9 @@ class PondApp extends StatelessWidget {
           labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
       ),
-  home: const SplashScreen(),
+      initialBinding: AppBindings(),
+      initialRoute: AppRoutes.splash,
+      getPages: AppPages.routes,
     );
   }
 }
-

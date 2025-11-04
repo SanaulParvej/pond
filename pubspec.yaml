@@ -36,6 +36,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   pdf: ^3.10.7
   printing: ^5.12.0
+  get: ^4.6.6
+  firebase_core: ^3.6.0
+  cloud_firestore: ^5.5.0
 
 dev_dependencies:
   flutter_test:
@@ -71,9 +74,15 @@ flutter:
   # later add new preview images, list them explicitly here or switch back
   # to bundling the whole folder while testing.
   assets:
-  - assets/pond.png
-  - assets/logo.png
-  - assets/bm9c_py8p_191023.jpg
+    - assets/pond.png
+    - assets/logo.png
+    - assets/pond_background.jpg
+  fonts:
+    - family: NotoSans
+      fonts:
+        - asset: assets/fonts/NotoSans-Regular.ttf
+        - asset: assets/fonts/NotoSans-Bold.ttf
+          weight: 700
 
 # Configuration for the flutter_launcher_icons package to generate
 # platform launcher icons from the provided logo at assets/logo.png
