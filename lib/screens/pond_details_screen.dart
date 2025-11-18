@@ -544,12 +544,51 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
     }
   }
 
+  double _totalFeedWeightKg(Iterable<Usage> usages) {
+    var total = 0.0;
+    for (final usage in usages) {
+      if (_categoryForUsage(usage) != 'feed') continue;
+      final weight = usage.weight;
+      if (weight <= 0) continue;
+      final unit = usage.unit.toLowerCase();
+      if (unit == 'kg') {
+        total += weight;
+      } else if (unit == 'gm' || unit == 'g') {
+        total += weight / 1000;
+      } else {
+        total += weight;
+      }
+    }
+    return total;
+  }
+
+  double _totalMedicineVolumeLiters(Iterable<Usage> usages) {
+    var total = 0.0;
+    for (final usage in usages) {
+      if (_categoryForUsage(usage) != 'medicine') continue;
+      final weight = usage.weight;
+      if (weight <= 0) continue;
+      final unit = usage.unit.toLowerCase();
+      if (unit == 'l') {
+        total += weight;
+      } else if (unit == 'ml') {
+        total += weight / 1000;
+      } else {
+        total += weight;
+      }
+    }
+    return total;
+  }
+
+  String _formatQuantity(double value) => value.toStringAsFixed(2);
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
       final usages = pondController.usagesForPond(widget.pondId);
-      final totalWeight = pondController.totalWeightForPond(widget.pondId);
       final totalCost = pondController.totalCostForPond(widget.pondId);
+      final feedWeightKg = _totalFeedWeightKg(usages);
+      final medicineVolumeL = _totalMedicineVolumeLiters(usages);
 
       final Map<String, List<Usage>> grouped = <String, List<Usage>>{};
       for (final usage in usages) {
@@ -771,7 +810,13 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 8, offset: const Offset(0, 4))]),
                 child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Total Weight', style: TextStyle(color: Colors.grey[700])), const SizedBox(height: 6), Text(totalWeight.toStringAsFixed(2), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))]),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Feed: ${_formatQuantity(feedWeightKg)} kg', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Text('Medicine: ${_formatQuantity(medicineVolumeL)} L', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
                   Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text('Total Cost', style: TextStyle(color: Colors.grey[700])), const SizedBox(height: 6), Text('Tk ${totalCost.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))]),
                 ]),
               ),
