@@ -9,7 +9,7 @@ import '../repository/pond_repository.dart';
 
 class PondController extends GetxController {
   PondController({PondRepository? repository})
-      : _repo = repository ?? PondRepository.instance;
+    : _repo = repository ?? PondRepository.instance;
 
   final PondRepository _repo;
 
@@ -70,14 +70,33 @@ class PondController extends GetxController {
     return List<Usage>.from(pondUsages[pondId] ?? const <Usage>[]);
   }
 
+  int indexOfUsage(int pondId, Usage usage) {
+    final usages = usagesForPond(pondId);
+    return usages.indexOf(usage);
+  }
+
+  Future<bool> removeUsageAt(int pondId, int index) async {
+    final usages = usagesForPond(pondId);
+    if (index < 0 || index >= usages.length) {
+      return false;
+    }
+
+    final usage = usages[index];
+    if (usage.id == null) {
+      return false;
+    }
+
+    return await removeUsage(usage.id!);
+  }
+
   double totalWeightForPond(int pondId) {
-    return usagesForPond(pondId)
-        .fold(0.0, (sum, usage) => sum + usage.weight);
+    return usagesForPond(pondId).fold(0.0, (sum, usage) => sum + usage.weight);
   }
 
   double totalCostForPond(int pondId) {
-    return usagesForPond(pondId)
-        .fold(0.0, (sum, usage) => sum + usage.totalPrice);
+    return usagesForPond(
+      pondId,
+    ).fold(0.0, (sum, usage) => sum + usage.totalPrice);
   }
 
   Future<bool> addUsage(Usage usage) async {

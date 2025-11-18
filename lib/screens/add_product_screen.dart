@@ -62,6 +62,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (widget.productType != null) {
       _category = widget.productType!.toLowerCase();
     }
+    _unit = _defaultUnitForCategory(_category);
   }
 
   @override
@@ -72,18 +73,33 @@ class _AddProductScreenState extends State<AddProductScreen> {
     super.dispose();
   }
 
+  String _defaultUnitForCategory(String category) {
+    return category.toLowerCase() == 'medicine' ? 'ml' : 'kg';
+  }
+
+  String _normalizedUnitForCategory(String category, String unit) {
+    final options = _baseUnitsForCategory(category);
+    final lowerUnit = unit.toLowerCase();
+    for (final option in options) {
+      if (option.toLowerCase() == lowerUnit) {
+        return option;
+      }
+    }
+    return options.first;
+  }
+
   void _resetForm({bool keepCategory = true}) {
     setState(() {
       _editingProduct = null;
       _nameCtrl.clear();
       _codeCtrl.clear();
       _priceCtrl.clear();
-      _unit = 'kg';
       if (!keepCategory && widget.productType == null) {
         _category = 'feed';
       } else if (widget.productType != null) {
         _category = widget.productType!.toLowerCase();
       }
+      _unit = _defaultUnitForCategory(_category);
     });
   }
 
@@ -93,25 +109,26 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _nameCtrl.text = product.name;
       _codeCtrl.text = product.code;
       _priceCtrl.text = product.pricePerUnit.toStringAsFixed(2);
-      _unit = product.unit;
       _category = widget.productType?.toLowerCase() ?? product.category;
+      _unit = _normalizedUnitForCategory(_category, product.unit);
     });
   }
 
   List<String> _baseUnitsForCategory(String category) {
     return category.toLowerCase() == 'medicine'
-        ? <String>['kg', 'ml']
+      ? <String>['ml', 'L']
         : <String>['kg', 'gm'];
   }
 
   List<DropdownMenuItem<String>> _unitDropdownItems() {
     String labelForUnit(String unit) {
-      return unit.toLowerCase() == 'ml' ? 'ML' : unit;
+      if (unit.toLowerCase() == 'ml') return 'ML';
+      if (unit.toLowerCase() == 'l') return 'L';
+      return unit;
     }
 
     final baseUnits = _baseUnitsForCategory(_category);
-    final units = baseUnits.contains(_unit) ? baseUnits : [...baseUnits, _unit];
-    return units
+    return baseUnits
         .map(
           (unit) => DropdownMenuItem<String>(
             value: unit,
@@ -430,10 +447,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                 if (v != null) {
                                   setState(() {
                                     _category = v;
-                                    final baseUnits = _baseUnitsForCategory(v);
-                                    if (!baseUnits.contains(_unit)) {
-                                      _unit = baseUnits.first;
-                                    }
+                                    _unit = _normalizedUnitForCategory(
+                                      v,
+                                      _unit,
+                                    );
                                   });
                                 }
                               },
@@ -479,8 +496,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                       vertical: 16,
                                     ),
                                     side: BorderSide(
-                                      color: theme.colorScheme.outline
-                                          .withValues(alpha: 0.6),
+                                      color: _isEditing
+                                          ? theme.colorScheme.outline
+                                              .withValues(alpha: 0.6)
+                                          : Colors.red,
+                                      width: _isEditing ? 1 : 2,
+                                    ),
+                                    foregroundColor:
+                                        _isEditing ? null : Colors.red,
+                                    textStyle: const TextStyle(
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                   child: Text(

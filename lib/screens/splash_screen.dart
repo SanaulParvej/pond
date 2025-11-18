@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../routes/app_routes.dart';
 
@@ -25,16 +26,22 @@ class _SplashScreenState extends State<SplashScreen>
     );
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack);
     _ctrl.forward();
-    // start timer after first frame to ensure Navigator has a valid context
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _timer = Timer(const Duration(milliseconds: 1800), () {
-        if (!mounted) return;
-        Get.offAllNamed(AppRoutes.home);
-      });
+      _timer = Timer(const Duration(milliseconds: 1800), _checkAuthState);
     });
   }
 
   Timer? _timer;
+
+  void _checkAuthState() async {
+    if (!mounted) return;
+
+    if (FirebaseAuth.instance.currentUser != null) {
+      Get.offAllNamed(AppRoutes.home);
+    } else {
+      Get.offAllNamed(AppRoutes.login);
+    }
+  }
 
   @override
   void dispose() {

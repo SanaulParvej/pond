@@ -93,7 +93,7 @@ class _AddUsageScreenState extends State<AddUsageScreen> {
       if (usage.weight > 0) {
         _weightCtrl.text = usage.weight.toString();
         final unitPrice =
-            product?.pricePerUnit ?? usage.totalPrice / usage.weight;
+            product?.pricePerUnit ?? (usage.totalPrice / usage.weight);
         _priceCtrl.text = unitPrice.toStringAsFixed(2);
       } else {
         _priceCtrl.text =
@@ -134,25 +134,25 @@ class _AddUsageScreenState extends State<AddUsageScreen> {
   void _save() async {
     final pondId = widget.pondId ?? _selectedPond;
     if (pondId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a pond')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Select a pond')));
       return;
     }
 
     if (isOther) {
       final name = _otherNameCtrl.text.trim();
       if (name.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter an expense name')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Enter an expense name')));
         return;
       }
       final amount = double.tryParse(_amountCtrl.text.trim());
       if (amount == null || amount <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter a valid amount')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Enter a valid amount')));
         return;
       }
       final usage = Usage(
@@ -180,9 +180,9 @@ class _AddUsageScreenState extends State<AddUsageScreen> {
 
     selected ??= _findProductByCode(_codeCtrl.text.trim());
     if (selected == null && _codeCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a product')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Select a product')));
       return;
     }
 
@@ -190,7 +190,8 @@ class _AddUsageScreenState extends State<AddUsageScreen> {
     final unitValue = selected?.unit ?? _unitCtrl.text.trim();
     final name = selected?.name ?? _nameCtrl.text.trim();
     final code = selected?.code ?? _codeCtrl.text.trim();
-    final unitPrice = selected?.pricePerUnit ??
+    final unitPrice =
+        selected?.pricePerUnit ??
         double.tryParse(_priceCtrl.text.trim()) ??
         0.0;
     final totalCost = w > 0 ? w * unitPrice : unitPrice;
@@ -271,8 +272,9 @@ class _AddUsageScreenState extends State<AddUsageScreen> {
                                 firstDate: DateTime(2000),
                                 lastDate: DateTime(2100),
                               );
-                              if (picked != null)
+                              if (picked != null) {
                                 setState(() => _selectedDate = picked);
+                              }
                             },
                             child: InputDecorator(
                               decoration: const InputDecoration(
@@ -304,8 +306,9 @@ class _AddUsageScreenState extends State<AddUsageScreen> {
                     if (!isOther) ...[
                       Autocomplete<String>(
                         optionsBuilder: (TextEditingValue textEditingValue) {
-                          if (textEditingValue.text.isEmpty)
+                          if (textEditingValue.text.isEmpty) {
                             return const Iterable<String>.empty();
+                          }
                           return productCodes.where(
                             (c) => c.toLowerCase().contains(
                               textEditingValue.text.toLowerCase(),
@@ -313,7 +316,6 @@ class _AddUsageScreenState extends State<AddUsageScreen> {
                           );
                         },
                         onSelected: (code) {
-                          // find in the available list first to honor category filter
                           final p = available.firstWhere(
                             (p) => p.code == code,
                             orElse: () => pondController.products.firstWhere(
@@ -465,6 +467,14 @@ class _AddUsageScreenState extends State<AddUsageScreen> {
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => Get.back(),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: const BorderSide(
+                                color: Colors.red,
+                                width: 2,
+                              ),
+                              foregroundColor: Colors.red,
+                            ),
                             child: const Text('Cancel'),
                           ),
                         ),
@@ -472,6 +482,14 @@ class _AddUsageScreenState extends State<AddUsageScreen> {
                         Expanded(
                           child: ElevatedButton(
                             onPressed: _save,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             child: Text(isEditing ? 'Update' : 'Save'),
                           ),
                         ),
