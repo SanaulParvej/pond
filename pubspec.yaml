@@ -13,6 +13,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   pdf: ^3.10.7
   printing: ^5.12.0
+  bangla_pdf_fixer: ^2.0.0
   get: ^4.6.6
   firebase_core: ^3.6.0
   cloud_firestore: ^5.5.0
@@ -34,7 +35,7 @@ flutter:
     - assets/pond.png
     - assets/logo.png
     - assets/pond_background.jpg
-    - assets/fonts/NotoSansBengali.ttf
+    - assets/fonts/NotoSansBengali-Regular.ttf
   fonts:
     - family: NotoSans
       fonts:
@@ -43,7 +44,7 @@ flutter:
           weight: 700
     - family: NotoSansBengali
       fonts:
-        - asset: assets/fonts/NotoSansBengali.ttf
+        - asset: assets/fonts/NotoSansBengali-Regular.ttf
 
 flutter_icons:
   android: true

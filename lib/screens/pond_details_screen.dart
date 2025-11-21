@@ -1,3 +1,4 @@
+import 'package:bangla_pdf_fixer/bangla_pdf_fixer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -20,6 +21,7 @@ class PondDetailsScreen extends StatefulWidget {
 
 class _PondDetailsScreenState extends State<PondDetailsScreen> {
   final PondController pondController = Get.find<PondController>();
+  bool _banglaFontsReady = false;
 
   void _openAddUsage({String? type}) async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddUsageScreen(pondId: widget.pondId, productType: type)));
@@ -89,20 +91,46 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
 
     double totalFor(List<Usage> list) => list.fold(0.0, (sum, u) => sum + u.totalPrice);
 
-    pw.Widget summaryRow(String label, String value, pw.TextStyle valueStyle) {
+    late final pw.Font banglaFont;
+    late final pw.Font fallbackFont;
+
+    pw.Widget buildPdfText(
+      String text, {
+      double fontSize = 11,
+      pw.FontWeight fontWeight = pw.FontWeight.normal,
+      PdfColor? color,
+      pw.TextAlign textAlign = pw.TextAlign.start,
+    }) {
+      final isBangla = text.isBanglaText;
+      final displayText = isBangla ? text.fix : text;
+      return pw.Text(
+        displayText,
+        style: pw.TextStyle(
+          font: isBangla ? banglaFont : fallbackFont,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: color,
+          fontFallback: isBangla ? [fallbackFont] : [banglaFont],
+        ),
+        textAlign: textAlign,
+      );
+    }
+
+    pw.Widget summaryRow(String label, String value, {double valueFontSize = 12, pw.FontWeight valueWeight = pw.FontWeight.bold}) {
       return pw.Padding(
         padding: const pw.EdgeInsets.symmetric(vertical: 4),
         child: pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [pw.Text(label), pw.Text(value, style: valueStyle)],
+          children: [
+            buildPdfText(label),
+            buildPdfText(value, fontSize: valueFontSize, fontWeight: valueWeight),
+          ],
         ),
       );
     }
 
     pw.Widget categorySection(String title, List<Usage> data, {required bool showWeight}) {
       final total = totalFor(data);
-      final headerStyle = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11);
-      final cellStyle = const pw.TextStyle(fontSize: 11);
       final headers = <String>['Date', 'Item', if (showWeight) 'Qty', 'Cost'];
       final rows = data.map((u) {
         final cells = <String>[
@@ -127,15 +155,15 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
           child: pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text(title, style: headerStyle),
-              pw.Text('Tk ${total.toStringAsFixed(2)}', style: headerStyle),
+              buildPdfText(title, fontSize: 11, fontWeight: pw.FontWeight.bold),
+              buildPdfText('Tk ${total.toStringAsFixed(2)}', fontSize: 11, fontWeight: pw.FontWeight.bold),
             ],
           ),
         ),
         if (data.isEmpty)
           pw.Padding(
             padding: const pw.EdgeInsets.symmetric(vertical: 12),
-            child: pw.Text('No records in this category', style: cellStyle.copyWith(color: PdfColors.grey600)),
+            child: buildPdfText('No records in this category', fontSize: 11, color: PdfColors.grey600),
           )
         else ...[
           pw.SizedBox(height: 8),
@@ -157,13 +185,13 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
               pw.TableRow(
                 decoration: const pw.BoxDecoration(color: PdfColors.grey300),
                 children: headers
-                    .map((h) => pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(h, style: headerStyle)))
+                    .map((h) => pw.Padding(padding: const pw.EdgeInsets.all(6), child: buildPdfText(h, fontSize: 11, fontWeight: pw.FontWeight.bold)))
                     .toList(),
               ),
               ...rows.map(
                 (row) => pw.TableRow(
-                  children: row
-                      .map((cell) => pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(cell, style: cellStyle)))
+                    children: row
+                        .map((cell) => pw.Padding(padding: const pw.EdgeInsets.all(6), child: buildPdfText(cell, fontSize: 11)))
                       .toList(),
                 ),
               ),
@@ -175,17 +203,25 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
     }
 
     final pondName = pondController.pondName(widget.pondId);
-    final totalWeight = pondController.totalWeightForPond(widget.pondId);
     final totalCost = pondController.totalCostForPond(widget.pondId);
+    final feedWeightKg = _totalFeedWeightKg(usages);
+    final medicineVolumeL = _totalMedicineVolumeLiters(usages);
 
-    final bengaliFontData = await rootBundle.load('assets/fonts/NotoSansBengali.ttf');
-    final baseFont = pw.Font.ttf(bengaliFontData.buffer.asByteData());
-    final boldFont = baseFont;
-    final pdfTheme = pw.ThemeData.withFont(base: baseFont, bold: boldFont);
+    final latinFallbackFontData = await rootBundle.load('assets/fonts/NotoSans-Regular.ttf');
+    fallbackFont = pw.Font.ttf(latinFallbackFontData.buffer.asByteData());
+    if (!_banglaFontsReady) {
+      await BanglaFontManager().initialize();
+      _banglaFontsReady = true;
+    }
+    banglaFont = BanglaFontManager().getFont(BanglaFontType.kalpurush);
+    final pdfTheme = pw.ThemeData.withFont(
+      base: fallbackFont,
+      bold: fallbackFont,
+      fontFallback: [banglaFont],
+    );
 
     try {
       final doc = pw.Document();
-      final boldValueStyle = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12);
 
       doc.addPage(
         pw.MultiPage(
@@ -194,13 +230,10 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
             theme: pdfTheme,
           ),
           build: (context) => [
-            pw.Text('Pond Summary', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+              buildPdfText('Pond Summary', fontSize: 20, fontWeight: pw.FontWeight.bold),
             pw.SizedBox(height: 4),
-            pw.Text(
-              pondName,
-              style: pw.TextStyle(fontSize: 14),
-            ),
-            pw.Text('Generated on ${_formatDisplayDate(DateTime.now())}', style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey600)),
+              buildPdfText(pondName, fontSize: 14),
+              buildPdfText('Generated on ${_formatDisplayDate(DateTime.now())}', fontSize: 11, color: PdfColors.grey600),
             pw.SizedBox(height: 16),
             pw.Container(
               padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -209,8 +242,9 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
                 border: pw.Border.all(color: PdfColors.grey400, width: 0.6),
               ),
               child: pw.Column(children: [
-                summaryRow('Total Weight', totalWeight.toStringAsFixed(2), boldValueStyle),
-                summaryRow('Total Cost', 'Tk ${totalCost.toStringAsFixed(2)}', boldValueStyle),
+                summaryRow('Feed', '${_formatQuantity(feedWeightKg)} kg'),
+                summaryRow('Medicine', '${_formatQuantity(medicineVolumeL)} L'),
+                summaryRow('Total Cost', 'Tk ${totalCost.toStringAsFixed(2)}'),
               ]),
             ),
             pw.SizedBox(height: 18),
@@ -220,7 +254,7 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
             pw.Divider(),
             pw.Align(
               alignment: pw.Alignment.centerRight,
-              child: pw.Text('Grand Total: Tk ${totalCost.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
+              child: buildPdfText('Grand Total: Tk ${totalCost.toStringAsFixed(2)}', fontSize: 13, fontWeight: pw.FontWeight.bold),
             ),
           ],
         ),
@@ -271,7 +305,6 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
     double weightFor(List<Usage> list) => list.fold(0.0, (sum, u) => sum + u.weight);
 
     showModalBottomSheet<void>(context: context, isScrollControlled: true, builder: (context) {
-      final totalWeight = pondController.totalWeightForPond(widget.pondId);
       final totalCost = pondController.totalCostForPond(widget.pondId);
       final feedGrouped = groupByDate(feedUsages);
       final medicineGrouped = groupByDate(medicineUsages);
@@ -279,6 +312,8 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
       final feedTotal = totalFor(feedUsages);
       final medicineTotal = totalFor(medicineUsages);
       final otherTotal = totalFor(otherUsages);
+      final feedWeightKg = _totalFeedWeightKg(usages);
+      final medicineVolumeL = _totalMedicineVolumeLiters(usages);
       return DraggableScrollableSheet(
         expand: false,
         builder: (context, scrollController) {
@@ -291,7 +326,9 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
               const SizedBox(height: 12),
               Text('Pond Summary', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 12),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Total Weight', style: TextStyle(color: Colors.grey[700])), Text(totalWeight.toStringAsFixed(2))]),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Feed', style: TextStyle(color: Colors.grey[700])), Text('${_formatQuantity(feedWeightKg)} kg')]),
+              const SizedBox(height: 6),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Medicine', style: TextStyle(color: Colors.grey[700])), Text('${_formatQuantity(medicineVolumeL)} L')]),
               const SizedBox(height: 6),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Total Cost', style: TextStyle(color: Colors.grey[700])), Text('Tk ${totalCost.toStringAsFixed(2)}')]),
               const SizedBox(height: 16),
@@ -346,7 +383,9 @@ class _PondDetailsScreenState extends State<PondDetailsScreen> {
                         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                           Text('Grand Totals', style: Theme.of(context).textTheme.titleMedium),
                           const SizedBox(height: 12),
-                          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Total Weight'), Text(totalWeight.toStringAsFixed(2))]),
+                          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Feed'), Text('${_formatQuantity(feedWeightKg)} kg')]),
+                          const SizedBox(height: 6),
+                          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Medicine'), Text('${_formatQuantity(medicineVolumeL)} L')]),
                           const SizedBox(height: 6),
                           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Total Cost'), Text('Tk ${totalCost.toStringAsFixed(2)}')]),
                         ]),
